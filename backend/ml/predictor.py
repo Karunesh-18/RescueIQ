@@ -108,11 +108,19 @@ def _build_training_dataframe() -> pd.DataFrame:
     return _bootstrap_from_restaurants()
 
 
+def _heuristic_surplus(avg_covers: int, event_flag: int = 0, weather_score: float = 0.5) -> float:
+    weather_factor = 0.85 + (max(0.0, min(1.0, weather_score)) * 0.3)
+    event_factor = 1.15 if int(event_flag or 0) else 1.0
+    baseline = max(1.0, float(avg_covers) * 0.12)
+    return max(0.0, baseline * weather_factor * event_factor)
+
+
 def _train_model():
     global _model
     df = _build_training_dataframe()
     if df.empty:
-        raise RuntimeError("No training data available. Add restaurants/donations first.")
+        print("[ML] No training data available. Using heuristic fallback model.")
+        return None
 
     if len(df) < 5:
         restaurants_df = _bootstrap_from_restaurants()
@@ -197,7 +205,10 @@ def predict_surplus(restaurant_id: int, day_of_week: int, event_flag: int = 0, w
         "avg_daily_covers": avg_covers,
     }])
 
-    raw_pred = float(model.predict(features)[0])
+    if model is None:
+        raw_pred = _heuristic_surplus(avg_covers, event_flag=event_flag, weather_score=weather_score)
+    else:
+        raw_pred = float(model.predict(features)[0])
     predicted = round(max(0.0, raw_pred), 1)
 
     # simple confidence band (±20%)

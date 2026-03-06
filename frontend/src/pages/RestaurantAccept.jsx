@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { FiCheckCircle, FiHeart, FiRefreshCw } from 'react-icons/fi'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 
 function isNgoRequest(item) {
   return String(item?.notes || '').includes('[NGO_REQUEST]')

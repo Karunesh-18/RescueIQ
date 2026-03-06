@@ -5,7 +5,7 @@ import {
 } from '@react-google-maps/api'
 import { FiRefreshCw, FiLayers, FiNavigation } from 'react-icons/fi'
 import { api } from '../api/client'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES = ['places']

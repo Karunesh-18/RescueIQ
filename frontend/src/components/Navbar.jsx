@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { FiHome, FiMap, FiBarChart2, FiHeart, FiSend, FiUser, FiLogOut } from 'react-icons/fi'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 import NotificationBell from './NotificationBell'
 
 const ROLE_COLOR = { restaurant: '#22c55e', provider: '#10b981', ngo: '#c084fc', admin: '#f59e0b' }

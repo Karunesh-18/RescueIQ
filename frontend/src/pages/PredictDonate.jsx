@@ -3,7 +3,7 @@ import { FiCheckCircle, FiSend, FiMessageSquare, FiAlertCircle, FiMapPin } from 
 import { MdOutlineRestaurantMenu } from 'react-icons/md'
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api'
 import { api } from '../api/client'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES = ['places']
@@ -37,7 +37,7 @@ export default function PredictDonate() {
   const [nearbySuggestions, setNearbySuggestions] = useState([])
   const [suggestionIndex, setSuggestionIndex] = useState(0)
   const [skippedSuggestionKeys, setSkippedSuggestionKeys] = useState([])
-  const [confirmedNgoName, setConfirmedNgoName] = useState('')
+  const [notifiedNgoName, setNotifiedNgoName] = useState('')
   const [error, setError] = useState('')
 
   const restaurant = { id: restaurantId, name: restaurantName || `Restaurant #${restaurantId}` }
@@ -113,7 +113,7 @@ export default function PredictDonate() {
       setNearbySuggestions([])
       setSuggestionIndex(0)
       setSkippedSuggestionKeys([])
-      setConfirmedNgoName('')
+      setNotifiedNgoName('')
       setStep(3)
     } catch (e) {
       const detail = e?.response?.data?.detail
@@ -125,7 +125,7 @@ export default function PredictDonate() {
   const reset = () => {
     setStep(0); setResult(null); setError(''); setQuantity(''); setNlpText('');
     setNotes(''); setPickupLocation(''); setPickupLatLng(null); setNearbySuggestions([])
-    setSuggestionIndex(0); setSkippedSuggestionKeys([]); setConfirmedNgoName('')
+    setSuggestionIndex(0); setSkippedSuggestionKeys([]); setNotifiedNgoName('')
   }
 
   useEffect(() => {
@@ -205,12 +205,12 @@ export default function PredictDonate() {
     setSuggestionIndex(0)
   }
 
-  const confirmDonationAtNgo = async () => {
+  const notifySuggestedNgo = async () => {
     if (!activeSuggestion || !result?.donation?.id) return
     setConfirmingDonation(true)
     const currentNotes = result?.donation?.notes || notes || ''
-    const confirmText = `[CONFIRMED_NGO] ${activeSuggestion.name}${activeSuggestion.address ? ` | ${activeSuggestion.address}` : ''}`
-    const mergedNotes = currentNotes ? `${currentNotes}\n${confirmText}` : confirmText
+    const notifyText = `[NOTIFIED_NGO] ${activeSuggestion.name}${activeSuggestion.address ? ` | ${activeSuggestion.address}` : ''}`
+    const mergedNotes = currentNotes ? `${currentNotes}\n${notifyText}` : notifyText
 
     const rawNgoId = activeSuggestion.db_ngo_id ?? activeSuggestion.id
     let ngoId = null
@@ -218,26 +218,29 @@ export default function PredictDonate() {
     if (typeof rawNgoId === 'string' && /^\d+$/.test(rawNgoId)) ngoId = Number(rawNgoId)
 
     try {
-      const payload = { status: 'matched', notes: mergedNotes }
+      const payload = { notes: mergedNotes }
       if (ngoId != null) payload.ngo_id = ngoId
       try {
         await api.updateDonation(result.donation.id, payload)
       } catch (error) {
         // If suggestion is an external place and not an internal NGO ID, retry without ngo_id.
         if (ngoId != null) {
-          await api.updateDonation(result.donation.id, { status: 'matched', notes: mergedNotes })
+          await api.updateDonation(result.donation.id, { notes: mergedNotes })
         } else {
           throw error
         }
       }
-      setConfirmedNgoName(activeSuggestion.name || 'Selected NGO')
-      setResult((prev) => prev ? ({ ...prev, donation: { ...prev.donation, status: 'matched', notes: mergedNotes } }) : prev)
+      setNotifiedNgoName(activeSuggestion.name || 'Selected NGO')
+      setResult((prev) => prev ? ({ ...prev, donation: { ...prev.donation, notes: mergedNotes } }) : prev)
     } catch (e) {
       const detail = e?.response?.data?.detail
-      setError(detail || 'Could not confirm donation for this NGO.')
+      setError(detail || 'Could not notify this NGO right now.')
     }
     setConfirmingDonation(false)
   }
+
+  const isMatchedNow = Boolean(result?.matched_ngo)
+  const hasNotifiedNgo = Boolean(notifiedNgoName)
 
   return (
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '2rem 1.25rem 100px' }}>
@@ -447,10 +450,14 @@ export default function PredictDonate() {
           </div>
 
           <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: 8 }}>
-            Donation <span className="gradient-text">Confirmed!</span>
+            Donation <span className="gradient-text">{isMatchedNow ? 'Matched!' : 'Posted!'}</span>
           </h1>
           <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-            Thank you, {restaurant?.name}. Your donation is now active.
+            {isMatchedNow
+              ? `Thank you, ${restaurant?.name}. Best matched NGO has been assigned.`
+              : hasNotifiedNgo
+                ? `Thank you, ${restaurant?.name}. Notification sent to suggested NGO. Waiting for acceptance.`
+                : `Thank you, ${restaurant?.name}. Your donation is live in the NGO queue.`}
           </p>
 
           {result.matched_ngo && (
@@ -479,17 +486,17 @@ export default function PredictDonate() {
               <div style={{ color: '#64748b', fontSize: '0.9rem' }}>
                 Your donation is visible in the NGO pickup queue. Suggested NGOs are shown below.
               </div>
-              {confirmedNgoName && (
+              {notifiedNgoName && (
                 <div style={{
                   marginTop: 10, padding: '0.75rem 0.9rem',
                   borderRadius: 10, border: '1px solid rgba(34,197,94,0.35)', background: 'rgba(34,197,94,0.12)',
                 }}>
                   <div style={{ color: '#4ade80', fontWeight: 700 }}>
-                    Donation confirmed at {confirmedNgoName}
+                    Notification sent to {notifiedNgoName}. Waiting for NGO acceptance.
                   </div>
                 </div>
               )}
-              {!confirmedNgoName && activeSuggestion && (
+              {!notifiedNgoName && activeSuggestion && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600, marginBottom: 4 }}>
                     SUGGESTED NGO {suggestionList.length > 1 ? `(${Math.min(suggestionIndex + 1, suggestionList.length)}/${suggestionList.length})` : ''}
@@ -514,15 +521,15 @@ export default function PredictDonate() {
                     <button
                       className="btn-primary"
                       style={{ flex: 1, justifyContent: 'center' }}
-                      onClick={confirmDonationAtNgo}
+                      onClick={notifySuggestedNgo}
                       disabled={confirmingDonation}
                     >
-                      {confirmingDonation ? 'Confirming...' : 'Donate'}
+                      {confirmingDonation ? 'Sending...' : 'Notify NGO'}
                     </button>
                   </div>
                 </div>
               )}
-              {!confirmedNgoName && !activeSuggestion && (
+              {!notifiedNgoName && !activeSuggestion && (
                 <div style={{ marginTop: 10, color: '#64748b', fontSize: '0.9rem' }}>
                   No more suggestions available right now. NGOs can still claim this donation from queue.
                 </div>

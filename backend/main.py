@@ -30,16 +30,15 @@ default_origins = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://10.209.109.148",
-    "http://10.209.109.148:5173",
-    "http://10.209.109.148:3000",
 ]
+allow_ip_origin_regex = r"^https?://(\d{1,3}\.){3}\d{1,3}(:\d+)?$"
 
 if cors_env and cors_env != "*":
     allow_origins = [item.strip() for item in cors_env.split(",") if item.strip()]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allow_origins,
+        allow_origin_regex=allow_ip_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -92,8 +91,16 @@ async def startup_event():
     except Exception as e:
         print(f"[RescueIQ] ⚠ DB init skipped ({e}). Backend may run in degraded mode.")
     print("[RescueIQ] Warming up XGBoost model...")
-    get_model()
-    start_scheduler()
+    try:
+        get_model()
+        print("[RescueIQ] ✓ ML model warm-up complete")
+    except Exception as e:
+        print(f"[RescueIQ] ⚠ ML warm-up skipped ({e}). Prediction endpoints will use fallback mode.")
+
+    try:
+        start_scheduler()
+    except Exception as e:
+        print(f"[RescueIQ] ⚠ Scheduler start skipped ({e})")
     print("[RescueIQ] ✓ Backend ready at http://0.0.0.0:8000")
     print(f"[RescueIQ] ✓ Accessible on LAN at http://{lan_ip}:8000")
     print(f"[RescueIQ] ✓ API docs at http://{lan_ip}:8000/docs")

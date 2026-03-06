@@ -3,7 +3,7 @@ import { FiRefreshCw, FiHeart, FiBell } from 'react-icons/fi'
 import DonationCard from '../components/DonationCard'
 import { api } from '../api/client'
 import { pushNotification } from '../components/NotificationBell'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 
 const STATUS_FILTERS = ['all', 'matched', 'accepted', 'picked_up', 'delivered', 'pending']
 const POLL_INTERVAL_MS = 5_000
@@ -14,13 +14,16 @@ function isUpcomingDonation(item) {
 
   const now = Date.now()
   const pickupTs = item.pickup_time ? Date.parse(item.pickup_time) : NaN
-  if (!Number.isNaN(pickupTs)) {
-    return pickupTs >= now - (2 * 60 * 60 * 1000)
+  const createdTs = item.created_at ? Date.parse(item.created_at) : NaN
+
+  // Primary rule: future pickup windows are actionable.
+  if (!Number.isNaN(pickupTs) && pickupTs >= now - (2 * 60 * 60 * 1000)) {
+    return true
   }
 
-  const createdTs = item.created_at ? Date.parse(item.created_at) : NaN
-  if (!Number.isNaN(createdTs)) {
-    return createdTs >= now - (36 * 60 * 60 * 1000)
+  // Fallback: open newly-created donations with missing/unclear pickup time.
+  if (!Number.isNaN(createdTs) && createdTs >= now - (24 * 60 * 60 * 1000)) {
+    return true
   }
 
   return false
@@ -105,7 +108,7 @@ export default function NGOView() {
             <FiHeart color="#22c55e" /> Pickup <span className="gradient-text">Requests</span>
           </h1>
           <p style={{ color: '#64748b', marginTop: 6 }}>
-            As pickup carrier, accept and update only upcoming requests (accepted → picked up → delivered).
+            As pickup carrier, accept and update actionable upcoming requests (accepted → picked up → delivered).
           </p>
         </div>
         <button className="btn-secondary" onClick={() => fetchDonations()} disabled={loading}>
@@ -145,7 +148,7 @@ export default function NGOView() {
       {filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '4rem', color: '#475569' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>No items</div>
-          <div>No donations in this category yet.</div>
+          <div>No actionable donations in this category yet.</div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

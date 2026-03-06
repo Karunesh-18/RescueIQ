@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { GoogleMap, OverlayView, useJsApiLoader } from '@react-google-maps/api'
 import { FiCheck, FiX, FiShield, FiStar, FiEdit2, FiAlertCircle, FiRefreshCw, FiMapPin, FiNavigation } from 'react-icons/fi'
 import { MdVolunteerActivism } from 'react-icons/md'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 import { api } from '../api/client'
 import ReviewCard from '../components/ReviewCard'
 

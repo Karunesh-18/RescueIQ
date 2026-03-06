@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FiMail, FiLock, FiUser, FiPhone, FiLogIn, FiUserPlus } from 'react-icons/fi'
 import { MdRestaurantMenu, MdVolunteerActivism, MdStorefront } from 'react-icons/md'
 import { RiAdminLine } from 'react-icons/ri'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 
 const ROLES = [
   { key: 'restaurant', label: 'Restaurant', icon: MdRestaurantMenu, color: '#22c55e' },

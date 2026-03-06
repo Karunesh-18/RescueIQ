@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthProvider, useAuth } from './auth/AuthContext'
 import Navbar from './components/Navbar'
 import Dashboard from './pages/Dashboard'
 import PredictDonate from './pages/PredictDonate'

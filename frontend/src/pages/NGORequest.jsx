@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FiSend, FiCheckCircle, FiAlertCircle } from 'react-icons/fi'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 import { api } from '../api/client'
 
 export default function NGORequest() {

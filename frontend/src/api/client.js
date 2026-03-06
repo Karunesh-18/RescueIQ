@@ -11,12 +11,24 @@ const normalizeBase = (value) => {
 }
 
 const unique = (arr) => [...new Set(arr.filter(Boolean))]
+const LAST_WORKING_BASE_KEY = 'riq_last_api_base_url'
+
+function resolveWebBaseURL(envBaseURL) {
+  const wlh = typeof window !== 'undefined' ? window.location.hostname : ''
+  if (envBaseURL && !envBaseURL.includes('localhost')) {
+    return trimSlash(envBaseURL)
+  }
+  if (wlh && wlh !== 'localhost' && wlh !== '127.0.0.1') {
+    return `http://${wlh}:8000`
+  }
+  return trimSlash(envBaseURL || 'http://localhost:8000')
+}
 
 /**
  * Resolve the backend base URL so it works everywhere:
  *
- * Browser (web, localhost):
- *   → always http://localhost:8000
+ * Browser (web):
+ *   → prefers current hostname IP, falls back to localhost
  *
  * Native Android/iOS — production APK:
  *   1. VITE_API_BASE_URL if set and non-localhost
@@ -26,19 +38,24 @@ const unique = (arr) => [...new Set(arr.filter(Boolean))]
  */
 function resolveCandidateBaseURLs() {
   const envBaseURL = import.meta.env.VITE_API_BASE_URL   // e.g. http://localhost:8000
-  const envHost    = import.meta.env.VITE_API_HOST        // e.g. 10.194.216.236
+  const envHost    = import.meta.env.VITE_API_HOST        // e.g. 10.0.0.25
   const envHosts   = import.meta.env.VITE_API_HOSTS       // e.g. 10.194.216.236,192.168.1.24
+  const savedBase  = normalizeBase(localStorage.getItem(LAST_WORKING_BASE_KEY))
 
   // ── Browser / web ───────────────────────────────────
   if (!Capacitor.isNativePlatform()) {
-    return [trimSlash(envBaseURL || 'http://localhost:8000')]
+    return [resolveWebBaseURL(envBaseURL)]
   }
 
   // ── Native app ──────────────────────────────────────
   const candidates = []
 
+  if (savedBase) {
+    candidates.push(savedBase)
+  }
+
   // 1. Explicit full URL (non-localhost)
-  if (envBaseURL && !envBaseURL.includes('localhost')) {
+  if (envBaseURL) {
     candidates.push(trimSlash(envBaseURL))
   }
 
@@ -68,6 +85,9 @@ function resolveCandidateBaseURLs() {
   // 4. Android emulator alias for the host machine loopback
   candidates.push('http://10.0.2.2:8000')
 
+  // 4b. Device loopback (web debug / local bridge edge cases)
+  candidates.push('http://127.0.0.1:8000')
+
   // 5. Last fallback for local bridge scenarios
   candidates.push('http://localhost:8000')
 
@@ -91,6 +111,7 @@ async function chooseReachableBaseURL() {
         })
         if (response.status >= 200 && response.status < 500) {
           ACTIVE_BASE_URL = base
+          localStorage.setItem(LAST_WORKING_BASE_KEY, base)
           return base
         }
       } catch {

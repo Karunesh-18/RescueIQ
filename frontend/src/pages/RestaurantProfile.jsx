@@ -5,7 +5,7 @@ import {
   FiCheck, FiX, FiShield, FiPackage, FiStar, FiEdit2, FiAlertCircle, FiRefreshCw, FiMapPin, FiNavigation
 } from 'react-icons/fi'
 import { MdRestaurantMenu } from 'react-icons/md'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 import { api } from '../api/client'
 import ReviewCard from '../components/ReviewCard'
 

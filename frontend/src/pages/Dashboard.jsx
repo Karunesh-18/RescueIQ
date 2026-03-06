@@ -4,7 +4,7 @@ import { FiHeart, FiMap, FiBarChart2, FiTrendingUp, FiBell, FiSend } from 'react
 import { MdOutlineFoodBank, MdEco } from 'react-icons/md'
 import StatCard from '../components/StatCard'
 import { api } from '../api/client'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 
 const MOCK_IMPACT = { meals_rescued: 580, food_waste_prevented_kg: 203, co2_reduced_kg: 325, ngos_supported: 5, restaurants_participating: 8, donations_this_week: 12, trees_equivalent: 15 }
 const NGO_DASHBOARD_POLL_MS = 5_000
