@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard'
 import PredictDonate from './pages/PredictDonate'
 import NGOView from './pages/NGOView'
 import NGORequest from './pages/NGORequest'
+import RestaurantAccept from './pages/RestaurantAccept'
+import RestaurantAcceptStatus from './pages/RestaurantAcceptStatus'
 import MapView from './pages/MapView'
 import ImpactDashboard from './pages/ImpactDashboard'
 import LoginPage from './pages/LoginPage'
@@ -43,6 +45,8 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/predict" element={isDonor ? <PredictDonate /> : <Navigate to="/request" replace />} />
+          <Route path="/accept" element={isDonor ? <RestaurantAccept /> : <Navigate to="/" replace />} />
+          <Route path="/accept-status" element={isDonor ? <RestaurantAcceptStatus /> : <Navigate to="/" replace />} />
           <Route path="/request" element={user.role === 'ngo' ? <NGORequest /> : <Navigate to="/predict" replace />} />
           <Route path="/ngo" element={user.role === 'ngo' ? <NGOView /> : <Navigate to="/" replace />} />
           <Route path="/map" element={<MapView />} />

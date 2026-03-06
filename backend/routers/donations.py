@@ -2,13 +2,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime
+from math import asin, cos, radians, sin, sqrt
 import copy
 from sqlalchemy import func
 from seed.mock_data import DONATIONS, RESTAURANTS, NGOS
 from services.matching import match_ngo
 from services.google_maps import places_nearby_search_sync, get_driving_distance_sync
 from models import Donation, DonationStatus, NGO, Prediction, Restaurant, SessionLocal
-from ml.predictor import retrain_model, predict_all_restaurants
+from ml.predictor import retrain_model
 
 router = APIRouter(prefix="/donations", tags=["Donations"])
 
@@ -132,6 +133,14 @@ def _is_valid_coord(lat: Optional[float], lng: Optional[float]) -> bool:
     if lat is None or lng is None:
         return False
     return -90 <= lat <= 90 and -180 <= lng <= 180 and not (abs(lat) < 0.0001 and abs(lng) < 0.0001)
+
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    earth_radius_km = 6371.0
+    d_lat = radians(lat2 - lat1)
+    d_lng = radians(lng2 - lng1)
+    a = sin(d_lat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lng / 2) ** 2
+    return earth_radius_km * (2 * asin(sqrt(a)))
 
 
 @router.get("")
@@ -331,7 +340,6 @@ def create_ngo_request(body: NGORequestCreate):
     finally:
         db_for_id.close()
 
-    donation_id = _next_id
     created_at = datetime.now()
     pickup_time_value = None
     if body.needed_by:
@@ -346,54 +354,98 @@ def create_ngo_request(body: NGORequestCreate):
         if not ngo:
             raise HTTPException(status_code=404, detail="NGO not found")
 
-        predictions = predict_all_restaurants(created_at.weekday())
-        if not predictions:
+        restaurants = db.query(Restaurant).all()
+        if not restaurants:
             raise HTTPException(status_code=400, detail="No restaurants available for matching")
 
-        ranked = sorted(predictions, key=lambda item: item.get("predicted_surplus", 0), reverse=True)
-        selected = next((item for item in ranked if item.get("predicted_surplus", 0) >= body.requested_quantity), ranked[0])
-        restaurant_id = selected["restaurant_id"]
-        restaurant_name = selected.get("restaurant_name", f"Restaurant #{restaurant_id}")
+        ngo_lat = ngo.latitude
+        ngo_lng = ngo.longitude
+        nearby_radius_km = 20.0
+        fallback_limit = 25
+        targets = []
+        use_nearby_scope = _is_valid_coord(ngo_lat, ngo_lng)
+
+        for restaurant in restaurants:
+            rest_lat = restaurant.latitude
+            rest_lng = restaurant.longitude
+            if use_nearby_scope:
+                if not _is_valid_coord(rest_lat, rest_lng):
+                    continue
+                distance_km = _haversine_km(ngo_lat, ngo_lng, rest_lat, rest_lng)
+                if distance_km > nearby_radius_km:
+                    continue
+            else:
+                distance_km = None
+
+            targets.append({
+                "restaurant": restaurant,
+                "distance_km": distance_km,
+                "predicted_surplus": None,
+            })
+
+        if not targets:
+            raise HTTPException(status_code=400, detail="No nearby restaurants available for matching")
+
+        if use_nearby_scope:
+            targets.sort(key=lambda item: item["distance_km"] if item["distance_km"] is not None else 10_000)
+        else:
+            targets = sorted(targets, key=lambda item: item["restaurant"].id)[:fallback_limit]
 
         request_note = f"[NGO_REQUEST] {body.notes or 'Food request submitted by NGO'}"
-        new = {
-            "id": donation_id,
-            "restaurant_id": restaurant_id,
-            "food_quantity": body.requested_quantity,
-            "food_type": body.food_type or "mixed",
-            "pickup_time": body.needed_by,
-            "notes": request_note,
-            "ngo_id": body.ngo_id,
-            "status": "pending",
-            "created_at": created_at.isoformat(),
-            "restaurant_name": restaurant_name,
-            "ngo_name": ngo.name,
-        }
+        created_requests = []
+        for target in targets:
+            donation_id = _next_id
+            restaurant = target["restaurant"]
+            restaurant_name = restaurant.name or f"Restaurant #{restaurant.id}"
 
-        _donations.append(new)
-        _next_id += 1
+            new = {
+                "id": donation_id,
+                "restaurant_id": restaurant.id,
+                "food_quantity": body.requested_quantity,
+                "food_type": body.food_type or "mixed",
+                "pickup_time": body.needed_by,
+                "notes": request_note,
+                "ngo_id": body.ngo_id,
+                "status": "pending",
+                "created_at": created_at.isoformat(),
+                "restaurant_name": restaurant_name,
+                "ngo_name": ngo.name,
+                "distance_km": round(target["distance_km"], 2) if target["distance_km"] is not None else None,
+                "predicted_surplus": target["predicted_surplus"],
+            }
 
-        donation = Donation(
-            id=donation_id,
-            restaurant_id=restaurant_id,
-            ngo_id=body.ngo_id,
-            food_quantity=body.requested_quantity,
-            food_type=body.food_type or "mixed",
-            pickup_time=pickup_time_value,
-            status=DonationStatus.PENDING,
-            notes=request_note,
-            created_at=created_at,
-        )
-        db.add(donation)
+            _donations.append(new)
+            created_requests.append(new)
+            _next_id += 1
+
+            donation = Donation(
+                id=donation_id,
+                restaurant_id=restaurant.id,
+                ngo_id=body.ngo_id,
+                food_quantity=body.requested_quantity,
+                food_type=body.food_type or "mixed",
+                pickup_time=pickup_time_value,
+                status=DonationStatus.PENDING,
+                notes=request_note,
+                created_at=created_at,
+            )
+            db.add(donation)
         db.commit()
 
         return {
-            "request": new,
-            "recommended_restaurant": {
-                "id": restaurant_id,
-                "name": restaurant_name,
-                "predicted_surplus": selected.get("predicted_surplus"),
-            },
+            "request": created_requests[0],
+            "requests": created_requests,
+            "targeted_restaurants": [
+                {
+                    "id": item["restaurant_id"],
+                    "name": item["restaurant_name"],
+                    "distance_km": item.get("distance_km"),
+                    "predicted_surplus": item.get("predicted_surplus"),
+                }
+                for item in created_requests
+            ],
+            "target_count": len(created_requests),
+            "scope": "nearby_restaurants" if use_nearby_scope else "fallback_restaurants_no_ngo_coordinates",
         }
     except HTTPException:
         db.rollback()

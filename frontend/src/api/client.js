@@ -173,6 +173,7 @@ export const api = {
   getDonations: (params = {}) => client.get('/donations', { params }).then(r => r.data),
   getDonation: (id) => client.get(`/donations/${id}`).then(r => r.data),
   createDonation: (data) => client.post('/donations', data).then(r => r.data),
+  createNGORequest: (data) => client.post('/donations/request', data).then(r => r.data),
   updateDonation: (id, data) => client.patch(`/donations/${id}`, data).then(r => r.data),
 
   // NGOs

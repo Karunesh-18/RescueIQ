@@ -58,7 +58,7 @@ export default function NGORequest() {
         Request <span className="gradient-text">Food Support</span>
       </h1>
       <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>
-        Submit your requirement and RescueIQ will route it to the best available restaurant.
+        Submit your requirement and RescueIQ will send it to nearby restaurants.
       </p>
 
       <div className="glass" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -137,12 +137,21 @@ export default function NGORequest() {
             <FiCheckCircle /> Request created
           </div>
           <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-            Request #{result.request.id} is now pending.
+            {result.target_count
+              ? `Sent to ${result.target_count} restaurant${result.target_count > 1 ? 's' : ''}.`
+              : `Request #${result.request.id} is now pending.`}
           </div>
-          {result.recommended_restaurant && (
+          {result.scope === 'fallback_restaurants_no_ngo_coordinates' && (
+            <div style={{ marginTop: 8, color: '#fbbf24', fontSize: '0.82rem' }}>
+              NGO location is missing. Set NGO profile coordinates to route strictly by nearby distance.
+            </div>
+          )}
+          {result.targeted_restaurants?.length > 0 && (
             <div style={{ marginTop: 8, color: '#cbd5e1' }}>
-              Suggested restaurant: <strong>{result.recommended_restaurant.name}</strong>
-              {' '}({result.recommended_restaurant.predicted_surplus} predicted surplus)
+              Closest target: <strong>{result.targeted_restaurants[0].name}</strong>
+              {typeof result.targeted_restaurants[0].distance_km === 'number' && (
+                <> ({result.targeted_restaurants[0].distance_km.toFixed(1)} km)</>
+              )}
             </div>
           )}
         </div>

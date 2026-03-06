@@ -20,7 +20,7 @@ export default function Navbar() {
     : isDonor ? [
         { path: '/', icon: FiHome, label: 'Home' },
         { path: '/predict', icon: FiSend, label: 'Donate' },
-        { path: '/impact', icon: FiBarChart2, label: 'Insights' },
+        { path: '/accept', icon: FiHeart, label: 'Accept' },
         { path: '/map', icon: FiMap, label: 'Map' },
         { path: '/profile', icon: FiUser, label: 'Profile' },
       ] : [
